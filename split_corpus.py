@@ -2,20 +2,32 @@
 # 分割语料
 import os
 import csv
+from collections import defaultdict
 
-
-from curLine_file import curLine, normal_transformer
+from curLine_file import curLine, normal_transformer, other_tag
 
 
 def process(source_file, train_file, dev_file):
     dev_lines = []
     train_num = 0
+    intent_distribution = defaultdict(dict)
     with open(source_file, "r") as f:
         reader = csv.reader(f)
         with open(train_file, "w") as f_train:
             train_write = csv.writer(f_train, dialect='excel')
             for row_id, line in enumerate(reader):
+                if row_id==0:
+                    continue
                 (sessionId, raw_query, domain_intent, param) = line
+                if domain_intent == other_tag:
+                    domain = other_tag
+                    intent = other_tag
+                else:
+                    domain, intent = domain_intent.split(".")
+                if intent in intent_distribution[domain]:
+                    intent_distribution[domain][intent] += 1
+                else:
+                    intent_distribution[domain][intent] = 0
                 if row_id == 0:
                     continue
                 sessionId = int(sessionId)
@@ -30,7 +42,8 @@ def process(source_file, train_file, dev_file):
             write.writerow(line)
     print(curLine(), "dev=%d, train=%d" % (len(dev_lines), train_num))
     # print(curLine(), "all_num=%d" % all_num)
-
+    for domain, intent_num in intent_distribution.items():
+        print(curLine(), domain, intent_num)
 
 if __name__ == "__main__":
     host_name = "cloudminds"

@@ -52,11 +52,9 @@ def _nlu_examples(input_file):
     session_list = []
     for row_id, (sessionId, raw_query, domain_intent, param) in enumerate(reader):
       query = normal_transformer(raw_query)
-      if row_id == 0:
-        continue
       sources = []
-      if row_id > 1 and sessionId == session_list[row_id-2][0]:
-        sources.append(session_list[row_id-2][1]) # last query
+      if row_id > 0 and sessionId == session_list[row_id - 1][0]:
+        sources.append(session_list[row_id-1][1]) # last query
       sources.append(query)
       if domain_intent == other_tag:
         domain = other_tag

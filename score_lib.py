@@ -28,7 +28,7 @@ import sari_hook
 import utils
 
 import tensorflow as tf
-from curLine_file import normal_transformer
+from curLine_file import normal_transformer, curLine
 
 def read_data(
     path,
@@ -49,25 +49,39 @@ def read_data(
     Tuple (list of sources, list of predictions, list of target lists)
   """
   sources = []
-  predictions = []
+  predDomain_list = []
+  predIntent_list = []
   domain_list = []
+  right_intent_num = 0
+  right_slot_num = 0
+  exact_num = 0
   with tf.gfile.GFile(path) as f:
     for line in f:
       if "source" in line and "prediction" in line and "target" in line:
         continue
-      sessionId, query, prediction, domain, intent = line.rstrip('\n').split('\t')
+      sessionId, query, predDomain,predIntent,predSlot, domain,intent,Slot = line.rstrip('\n').split('\t')
       # if lowercase:
       #   source = normal_transformer(source.lower())
       #   pred = normal_transformer(pred.lower())
       #   targets = [normal_transformer(t.lower()) for t in targets]
       # sources.append(source)
-      predictions.append(prediction)
+      if predIntent == intent:
+        right_intent_num += 1
+        if predSlot == Slot:
+          exact_num += 1
+      else:
+        print(curLine(), predIntent, "intent:", intent)
+      if predSlot == Slot:
+        right_slot_num += 1
+      else:
+        print(curLine(), predSlot, "Slot:", Slot, "predDomain:%s, domain:%s" % (predDomain, domain))
+      predDomain_list.append(predDomain)
+      predIntent_list.append(predIntent)
       domain_list.append(domain)
-  return predictions, domain_list
+  return predDomain_list, predIntent_list, domain_list, right_intent_num, right_slot_num, exact_num
 
 
-def compute_exact_score(predictions,
-                        target_lists):
+def compute_exact_score(predictions, domain_list):
   """Computes the Exact score (accuracy) of the predictions.
 
   Exact score is defined as the percentage of predictions that match at least
@@ -80,15 +94,12 @@ def compute_exact_score(predictions,
   Returns:
     Exact score between [0, 1].
   """
-  num_matches = sum(any(pred == target for target in targets)
-                    for pred, targets in zip(predictions, target_lists))
-  # num_matches=0.0
-  # for pred, targets in zip(predictions, target_lists):
-  #   for target in targets:
-  #     if pred == target:
-  #       num_matches += 1
-  #       break
-  return num_matches / max(len(predictions), 0.1)  # Avoids 0/0.
+
+  correct_domain = 0
+  for p, d in zip(predictions, domain_list):
+      if p==d:
+        correct_domain += 1
+  return correct_domain / max(len(predictions), 0.1)  # Avoids 0/0.
 
 
 def compute_sari_scores(

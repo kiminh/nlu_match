@@ -131,22 +131,27 @@ class BertExampleBuilder(object):
     source_tokens = self._tokenizer.tokenize(sources[-1]) #current query
     if len(sources) > 0:  # context
       source_tokens = self._tokenizer.tokenize(sources[0]) + ['[SEP]'] + source_tokens
-
+    # print(curLine(), len(source_tokens), "source_tokens:", source_tokens)
     if target not in self._label_map:
       self._label_map[target] = len(self._label_map)
     labels = self._label_map[target]
-    tokens, token_start_indices = self._split_to_wordpieces(source_tokens)
+    # tokens, token_start_indices = self._split_to_wordpieces(source_tokens) # TODO
+    token_start_indices = []
+    for t in source_tokens:
+      token_start_indices.append(len(token_start_indices))
+
     # if len(tokens)>self._max_seq_length - 2:
     #   print(curLine(), "%d tokens is to long," % len(task.source_tokens), "truncate task.source_tokens:", task.source_tokens)
     #  截断到self._max_seq_length - 2
-    tokens = self._truncate_list(tokens)
-    if sep_mark not in tokens:# TODO
-      print(curLine(), tokens)
-      print(curLine(), len(sources), sources)
+    tokens = self._truncate_list(source_tokens)
+    # print(curLine(), tokens)  # TODO TODO
 
     input_tokens = ['[CLS]'] + tokens + ['[SEP]']
-    question_len = 1 + tokens.index(sep_mark)
-    segment_ids = [0] * (question_len+1) + [1] * (len(tokens) - question_len + 1)  # cls and sep
+    if sep_mark in tokens:
+      context_len = 1 + tokens.index(sep_mark)
+      segment_ids = [0] * (context_len+1) + [1] * (len(tokens) - context_len + 1)  # cls and sep
+    else:
+      segment_ids = [0] * len(input_tokens)
     assert len(segment_ids) == len(input_tokens) # TODO
 
     input_ids = self._tokenizer.convert_tokens_to_ids(input_tokens)

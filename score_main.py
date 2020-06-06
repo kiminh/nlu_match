@@ -49,15 +49,18 @@ def main(argv):
     raise app.UsageError('Too many command-line arguments.')
   flags.mark_flag_as_required('prediction_file')
 
-  predictions, domain_list = score_lib.read_data(
+  predDomain_list, predIntent_list, domain_list, right_intent_num, right_slot_num, exact_num = score_lib.read_data(
       FLAGS.prediction_file, FLAGS.do_lower_case)
   logging.info(f'Read file: {FLAGS.prediction_file}')
-  for p, d in zip(predictions, domain_list):
-      print(curLine(), p, d)
-  exact = score_lib.compute_exact_score(predictions, domain_list)
+  all_num = len(domain_list)
+  domain_acc = score_lib.compute_exact_score(predDomain_list, domain_list)
   # sari, keep, addition, deletion, length_sum, length_max = score_lib.compute_sari_scores(
   #     sources, predictions, target_lists, tokenizer=tokenizer)
-  print('Num=%d, Exact score=%.3f' % (len(domain_list), exact))
+  intent_acc = float(right_intent_num) / all_num
+  slot_acc = float(right_slot_num) / all_num
+  exact_score = float(exact_num) / all_num
+  print('Num=%d, domain_acc=%.3f, intent_acc=%.3f, slot_acc=%.3f, exact_score=%.3f'
+        % (all_num, domain_acc, intent_acc, slot_acc, exact_score))
 
 
 if __name__ == '__main__':

@@ -1,8 +1,0 @@
-pyenv activate python363tf111
-pyenv activate python373tf115
-
-dev=1679, train=15331
-RoBERTa-tiny-clue
-domain 测试
-1500steps
-9000steps

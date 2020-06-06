@@ -31,7 +31,7 @@ import bert_example
 import predict_utils
 import csv
 import utils
-from bert import tokenization
+import acmation
 from curLine_file import curLine, normal_transformer, other_tag
 
 sep_str = '$'
@@ -45,7 +45,10 @@ flags.DEFINE_enum(
     'Format which indicates how to parse the input_file.')
 flags.DEFINE_string(
     'output_file', None,
-    'Path to the TSV file where the predictions are written to.')
+    'Path to the CSV file where the predictions are written to.')
+flags.DEFINE_string(
+    'submit_file', None,
+    'Path to the CSV file where the predictions are written to.')
 flags.DEFINE_string(
     'label_map_file', None,
     'Path to the label map file. Either a JSON file ending with ".json", that '
@@ -82,51 +85,72 @@ def main(argv):
     print(colored("%s input file:%s" % (curLine(), FLAGS.input_file), "red"))
     domain_list = []
     intent_list = []
+    slot_list = []
     sources_list = []
     predict_batch_size = 64
-    limit = predict_batch_size * 15 * 2 # 5184 #　10001 #
+    limit = predict_batch_size * 1500 # 5184 #　10001 #
+    run_mode = "eval"
+    if "test.csv" in FLAGS.input_file:
+        run_mode = "predict"
     with tf.gfile.GFile(FLAGS.input_file) as f:
         reader = csv.reader(f)
         session_list = []
         for row_id, line in enumerate(reader):
-            # (sessionId, raw_query)
-            (sessionId, raw_query, domain_intent, param) = line
-            query = normal_transformer(raw_query)
-            if domain_intent == other_tag:
-                domain = other_tag
+            if len(line) > 2:
+                (sessionId, raw_query, domain_intent, slot) = line
             else:
-                domain, intent = domain_intent.split(".")
-            if row_id == 0:
-                continue
+                (sessionId, raw_query) = line
+            query = normal_transformer(raw_query)
+
             sources = []
-            if row_id > 1 and sessionId == session_list[row_id - 2][0]:
-                sources.append(session_list[row_id - 2][1])  # last query
+            if row_id > 0 and sessionId == session_list[row_id - 1][0]:
+                sources.append(session_list[row_id - 1][1])  # last query
             sources.append(query)
-            session_list.append((sessionId, query))
+            session_list.append((sessionId, raw_query))
             sources_list.append(sources)
-            domain_list.append(domain)
-            intent_list.append(intent)
+            if len(line) > 2: # 有标注
+                if domain_intent == other_tag:
+                    domain = other_tag
+                    intent = other_tag
+                else:
+                    domain, intent = domain_intent.split(".")
+                domain_list.append(domain)
+                intent_list.append(intent)
+                slot_list.append(slot)
             if len(sources_list) >= limit:
                 print(colored("%s stop reading at %d to save time" %(curLine(), limit), "red"))
                 break
 
     number = len(sources_list)  # 总样本数
+    predict_domain_list = []
+    predict_intent_list = []
+    slot_info_list = []
     predict_batch_size = min(predict_batch_size, number)
     batch_num = math.ceil(float(number) / predict_batch_size)
     start_time = time.time()
     num_predicted = 0
-    with tf.gfile.Open(FLAGS.output_file, 'w') as writer:
-        writer.write("\t".join(["sessionId", "query", "prediction", "domain", "intent"]) + "\n")
+    modemode = 'a'
+    if len(domain_list) > 0:  # 有标注
+        modemode = 'w'
+    with tf.gfile.Open(FLAGS.output_file, modemode) as writer:
+        if len(domain_list) > 0:  # 有标注
+            writer.write("\t".join(["sessionId", "query", "predDomain", "predIntent", "predSlot", "domain", "intent", "Slot"]) + "\n")
         for batch_id in range(batch_num):
             sources_batch = sources_list[batch_id * predict_batch_size: (batch_id + 1) * predict_batch_size]
             prediction_batch = predictor.predict_batch(sources_batch=sources_batch)
             assert len(prediction_batch) == len(sources_batch)
             num_predicted += len(prediction_batch)
-            for id, [prediction, sources] in enumerate(zip(prediction_batch, sources_batch)):
-                domain = domain_list[batch_id * predict_batch_size + id]
-                intent = intent_list[batch_id * predict_batch_size + id]
-                sessionId, query = session_list[batch_id * predict_batch_size + id]
-                writer.write("\t".join([sessionId, query, prediction, domain, intent]) + "\n")
+            for id, [predict_domain, sources] in enumerate(zip(prediction_batch, sources_batch)):
+                sessionId, raw_query = session_list[batch_id * predict_batch_size + id]
+                predict_intent, slot_info = rules(sources, predict_domain)
+                predict_domain_list.append(predict_domain)
+                predict_intent_list.append(predict_intent)
+                slot_info_list.append(slot_info)
+                if len(domain_list)>0: # 有标注
+                    domain = domain_list[batch_id * predict_batch_size + id]
+                    intent = intent_list[batch_id * predict_batch_size + id]
+                    slot = slot_list[batch_id * predict_batch_size + id]
+                    writer.write("\t".join([sessionId, raw_query, predict_domain, predict_intent, slot_info, domain, intent, slot]) + "\n")
             if batch_id % 5 == 0:
                 cost_time = (time.time() - start_time) / 60.0
                 print("%s batch_id=%d/%d, predict %d/%d examples, cost %.2fmin." %
@@ -136,8 +160,56 @@ def main(argv):
         f'{curLine()} {num_predicted} predictions saved to:{FLAGS.output_file}, cost {cost_time} min, ave {cost_time/num_predicted*60} s.')
 
 
+    if FLAGS.submit_file is not None:
+        import collections, os
+        domain_counter = collections.Counter()
+        if os.path.exists(path=FLAGS.submit_file):
+            os.remove(FLAGS.submit_file)
+        with open(FLAGS.submit_file, 'w',encoding='UTF-8') as f:
+            writer = csv.writer(f, dialect='excel')
+            # writer.writerow(["session_id", "query", "intent", "slot_annotation"])  # TODO
+            for example_id, sources in enumerate(sources_list):
+                sessionId, raw_query = session_list[example_id]
+                predict_domain = predict_domain_list[example_id]
+                predict_intent = predict_intent_list[example_id]
+                predict_domain_intent = other_tag
+                domain_counter.update([predict_domain])
+                if predict_domain != other_tag:
+                    predict_domain_intent = "%s.%s" % (predict_domain, predict_intent)
+                line = [sessionId, raw_query, predict_domain_intent, slot_info_list[example_id]]
+                writer.writerow(line)
+        print(curLine(), "example_id=", example_id)
+        print(curLine(), "domain_counter:", domain_counter)
     cost_time = (time.time() - start_time) / 1.0
     print(curLine(), "cost %f s" % cost_time)
+
+cancel_keywords = ["取消", "关闭", "停止"]
+
+def rules(sources, predict_domain):
+    predict_intent = predict_domain  # OTHERS
+    slot_info = sources[-1]
+    if predict_domain == "navigation":
+        predict_intent = 'navigation'
+        for word in cancel_keywords:
+            if word in sources[-1]:
+                predict_intent = 'cancel_navigation'
+                break
+        slot_info = acmation.get_slot_info(sources[-1], domain=predict_domain)
+    elif predict_domain == 'music':
+        predict_intent = 'play'
+        for word in cancel_keywords:
+            if word in sources[-1]:
+                predict_intent = 'pause'
+                break
+        slot_info = acmation.get_slot_info(sources[-1], domain=predict_domain)
+    elif predict_domain == 'phone_call':
+        predict_intent = 'make_a_phone_call'
+        for word in cancel_keywords:
+            if word in sources[-1]:
+                predict_intent = 'cancel'
+                break
+        slot_info = acmation.get_slot_info(sources[-1], domain=predict_domain)
+    return predict_intent, slot_info
 
 if __name__ == '__main__':
     app.run(main)
