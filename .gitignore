@@ -1,6 +1,7 @@
 # Byte-compiled / optimized / DLL files
 *-notice.txt
 *log.txt
+*score.txt
 *.jsonl
 *.pickle
 *results.txt

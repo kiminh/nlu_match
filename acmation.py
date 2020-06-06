@@ -235,7 +235,7 @@ def get_slot_info(query, domain):
     if domain == "phone_call":
         numbers = re.findall("\d+", query)
         for number in numbers:
-            entity_map[number] = (number, "phone_num")
+            entity_map[number] = ("phone_num", number)
     else:
         useEntityTypeList = domain2entity_map[domain]
         entityTypeMap = get_all_entity(query, useEntityTypeList=useEntityTypeList)
