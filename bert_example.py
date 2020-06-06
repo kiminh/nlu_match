@@ -40,13 +40,11 @@ class BertExample(object):
 
   def __init__(self, input_ids,
                input_mask,
-               segment_ids, labels,
-               labels_mask,
-               token_start_indices,
-               task, default_label):
+               segment_ids,
+               labels,
+               token_start_indices):
     input_len = len(input_ids)
-    if not (input_len == len(input_mask) and input_len == len(segment_ids) and
-            input_len == len(labels) and input_len == len(labels_mask)):
+    if not (input_len == len(input_mask) and input_len == len(segment_ids)):
       raise ValueError(
           'All feature lists should have the same length ({})'.format(
               input_len))
@@ -56,11 +54,8 @@ class BertExample(object):
         ('input_mask', input_mask),
         ('segment_ids', segment_ids),
         ('labels', labels),
-        ('labels_mask', labels_mask),
     ])
     self._token_start_indices = token_start_indices
-    self.editing_task = task
-    self._default_label = default_label
 
   def pad_to_max_length(self, max_seq_length, pad_token_id):
     """Pad the feature vectors so that they all have max_seq_length.
@@ -72,6 +67,8 @@ class BertExample(object):
     """
     pad_len = max_seq_length - len(self.features['input_ids'])
     for key in self.features:
+      if key == "labels":
+        continue
       pad_id = pad_token_id if key == 'input_ids' else 0
       self.features[key].extend([pad_id] * pad_len)
       if len(self.features[key]) != max_seq_length:
@@ -83,34 +80,18 @@ class BertExample(object):
 
     def int_feature(values):
       return tf.train.Feature(int64_list=tf.train.Int64List(value=list(values)))
-
     tf_features = collections.OrderedDict([
-        (key, int_feature(val)) for key, val in self.features.items()
+        (key, int_feature(val)) if type(val) is not int else (key, int_feature([val])) for key, val in self.features.items()
     ])
     return tf.train.Example(features=tf.train.Features(feature=tf_features))
 
-  def get_token_labels(self):
-    """Returns labels/tags for the original tokens, not for wordpieces."""
-    labels = []  # 0:keep 1:delete
-    for idx in self._token_start_indices:
-      # For unmasked and untruncated tokens, use the label in the features, and
-      # for the truncated tokens, use the default label.
-      if idx < len(self.features['labels']) and self.features['labels_mask'][idx] == 1:
-        if self.features['labels_mask'][idx] == 1:
-          labels.append(self.features['labels'][idx])
-        else:
-          labels.append(self._default_label)  #
-      else:
-        labels.append(self._default_label)
-    return labels
 
 
 class BertExampleBuilder(object):
   """Builder class for BertExample objects."""
 
   def __init__(self, label_map, vocab_file,
-               max_seq_length, do_lower_case,
-               converter):
+               max_seq_length, do_lower_case):
     """Initializes an instance of BertExampleBuilder.
 
     Args:
@@ -119,12 +100,10 @@ class BertExampleBuilder(object):
       max_seq_length: Maximum sequence length.
       do_lower_case: Whether to lower case the input text. Should be True for
         uncased models and False for cased models.
-      converter: Converter from text targets to tags.
     """
     self._label_map = label_map
     self._tokenizer = tokenization.FullTokenizer(vocab_file, do_lower_case=do_lower_case)
     self._max_seq_length = max_seq_length
-    self._converter = converter
     self._pad_id = self._get_pad_id()
 
 
@@ -132,7 +111,6 @@ class BertExampleBuilder(object):
       self,
       sources,
       target = None,
-      use_arbitrary_target_ids_for_infeasible_examples = False,
       location = None
   ):
     """Constructs a BERT Example.
@@ -149,35 +127,26 @@ class BertExampleBuilder(object):
       and use_arbitrary_target_ids_for_infeasible_examples == False.
     """
     # Compute target labels.
-    sep_mark = '[SEP]' #　'$' #　
-    task = tagging.EditingTask(sources, location=location, tokenizer=self._tokenizer, sep_mark=sep_mark)
-    if target is not None:
-      tags = self._converter.compute_tags(task, target)
-    else:
-      # If target is not provided, we set all target labels to KEEP.
-      tags = [tagging.Tag('KEEP') for _ in task.source_tokens]
-    labels = [self._label_map[str(tag)] for tag in tags]
-    tokens, labels, token_start_indices, labels_mask = self._split_to_wordpieces( #  wordpiece： tag是以ｗｏｒｄ为单位的，组成ｗｏｒｄ的ｐｉｅｃｅ的标注与这个ｗｏｒｄ相同
-        task.source_tokens, labels, labels_mask_previous=task.labels_mask)
+    sep_mark = '[SEP]'
+    source_tokens = self._tokenizer.tokenize(sources[-1]) #current query
+    if len(sources) > 0:  # context
+      source_tokens = self._tokenizer.tokenize(sources[0]) + ['[SEP]'] + source_tokens
+
+    if target not in self._label_map:
+      self._label_map[target] = len(self._label_map)
+    labels = self._label_map[target]
+    tokens, token_start_indices = self._split_to_wordpieces(source_tokens)
     # if len(tokens)>self._max_seq_length - 2:
     #   print(curLine(), "%d tokens is to long," % len(task.source_tokens), "truncate task.source_tokens:", task.source_tokens)
     #  截断到self._max_seq_length - 2
     tokens = self._truncate_list(tokens)
-    labels = self._truncate_list(labels)
-
-    labels_mask = self._truncate_list(labels_mask)
     if sep_mark not in tokens:# TODO
       print(curLine(), tokens)
       print(curLine(), len(sources), sources)
 
-
     input_tokens = ['[CLS]'] + tokens + ['[SEP]']
-    labels_mask = [0] + labels_mask + [0]  # [1 if tt not in ['[CLS]', '[SEP]'] else 0 for tt in input_tokens ]
-
-    labels = [0] + labels + [0]
     question_len = 1 + tokens.index(sep_mark)
     segment_ids = [0] * (question_len+1) + [1] * (len(tokens) - question_len + 1)  # cls and sep
-    # segment_ids = [0] * len(input_tokens)  # TODO exact=8.9
     assert len(segment_ids) == len(input_tokens) # TODO
 
     input_ids = self._tokenizer.convert_tokens_to_ids(input_tokens)
@@ -188,14 +157,11 @@ class BertExampleBuilder(object):
         input_mask=input_mask,
         segment_ids=segment_ids,
         labels=labels,
-        labels_mask=labels_mask,
-        token_start_indices=token_start_indices,
-        task=task,
-        default_label=self._delete_tag_id)
+        token_start_indices=token_start_indices)
     example.pad_to_max_length(self._max_seq_length, self._pad_id)
     return example
 
-  def _split_to_wordpieces(self, tokens, labels, labels_mask_previous):
+  def _split_to_wordpieces(self, tokens):
     """Splits tokens (and the labels accordingly) to WordPieces.
 
     Args:
@@ -207,8 +173,6 @@ class BertExampleBuilder(object):
       WordPieces that start a token.
     """
     bert_tokens = []  # Original tokens split into wordpieces.
-    bert_labels = []  # Label for each wordpiece.
-    labels_mask = []
     # Index of each wordpiece that starts a new token.
     token_start_indices = []
     for i, token in enumerate(tokens):
@@ -219,9 +183,7 @@ class BertExampleBuilder(object):
       else:
         pieces = ["[SEP]"]
       bert_tokens.extend(pieces)
-      bert_labels.extend([labels[i]] * len(pieces))
-      labels_mask.extend([labels_mask_previous[i]] * len(pieces))
-    return bert_tokens, bert_labels, token_start_indices, labels_mask
+    return bert_tokens, token_start_indices
 
   def _truncate_list(self, x):
     """Returns truncated version of x according to the self._max_seq_length."""

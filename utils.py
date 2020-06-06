@@ -22,23 +22,11 @@ from __future__ import division
 from __future__ import print_function
 
 import json
-from typing import Iterator, Mapping, Sequence, Text, Tuple
+import csv
 
 import tensorflow as tf
-from curLine_file import curLine, normal_transformer
+from curLine_file import curLine, normal_transformer, other_tag
 
-# # return list of word
-# def get_token_list(text):
-#   """Returns a list of tokens.
-#
-#   This function expects that the tokens in the text are separated by space
-#   character(s). Example: "ca n't , touch". This is the case at least for the
-#   public DiscoFuse and WikiSplit datasets.
-#
-#   Args:
-#     text: String to be split into tokens.
-#   """
-#   return list(text) # text.split()
 
 
 def yield_sources_and_targets(input_file, input_format):
@@ -51,57 +39,31 @@ def yield_sources_and_targets(input_file, input_format):
   Yields:
     Tuple with (list of source texts, target text).
   """
-  if input_format == 'qa':
-    yield_example_fn = _qa_examples
-  elif input_format == 'wikisplit':
-    yield_example_fn = _yield_wikisplit_examples
-  elif input_format == 'discofuse':
-    yield_example_fn = _yield_discofuse_examples
+  if input_format == 'nlu':
+    yield_example_fn = _nlu_examples
   else:
     raise ValueError('Unsupported input_format: {}'.format(input_format))
   for sources, target in yield_example_fn(input_file):
     yield sources, target
 
-def _qa_examples(input_file):
-  print(curLine(), input_file)
+def _nlu_examples(input_file):
   with tf.gfile.GFile(input_file) as f:
-    for line in f:
-      line_split = line.rstrip('\n').split('\t')
-      if len(line_split) == 4:
-          question, source, target, lcs_rate = line.rstrip('\n').split('\t')
-          question = normal_transformer(question)
-          source = normal_transformer(source)
-          target = normal_transformer(target)
-          if min(len(question), len(source), len(target)) == 0:
-            continue
-          yield [question,source], target
-
-def _yield_wikisplit_examples(input_file):
-  with tf.gfile.GFile(input_file) as f:
-    for line in f:
-      source, target, lcs_rate = line.rstrip('\n').split('\t')
-      yield [source], target
-
-
-def _yield_discofuse_examples(
-    input_file):
-  """Yields DiscoFuse examples.
-
-  The documentation for this format:
-  https://github.com/google-research-datasets/discofuse#data-format
-
-  Args:
-    input_file: Path to the input file.
-  """
-  with tf.io.gfile.GFile(input_file) as f:
-    for i, line in enumerate(f):
-      if i == 0:  # Skip the header line.
+    reader = csv.reader(f)
+    session_list = []
+    for row_id, (sessionId, raw_query, domain_intent, param) in enumerate(reader):
+      query = normal_transformer(raw_query)
+      if row_id == 0:
         continue
-      coherent_1, coherent_2, incoherent_1, incoherent_2, _, _, _, _ = (
-          line.rstrip('\n').split('\t'))
-      # Strip because the second coherent sentence might be empty.
-      fusion = (coherent_1 + ' ' + coherent_2).strip()
-      yield [incoherent_1, incoherent_2], fusion
+      sources = []
+      if row_id > 1 and sessionId == session_list[row_id-2][0]:
+        sources.append(session_list[row_id-2][1]) # last query
+      sources.append(query)
+      if domain_intent == other_tag:
+        domain = other_tag
+      else:
+        domain, intent = domain_intent.split(".")
+      session_list.append((sessionId, query))
+      yield sources, domain
 
 
 def read_label_map(path):

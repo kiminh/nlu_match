@@ -31,10 +31,11 @@ from absl import flags
 from absl import logging
 from bert import tokenization
 import bert_example
-import tagging_converter
+import json
 import utils
 
 import tensorflow as tf
+import csv
 from curLine_file import curLine
 
 FLAGS = flags.FLAGS
@@ -44,15 +45,16 @@ flags.DEFINE_string(
     'Path to the input file containing examples to be converted to '
     'tf.Examples.')
 flags.DEFINE_enum(
-    'input_format', None, ['wikisplit', 'discofuse', 'qa'],
+    'input_format', None, ['nlu'],
     'Format which indicates how to parse the input_file.')
-flags.DEFINE_string('output_tfrecord', None,
+flags.DEFINE_string('output_tfrecord_train', None,
+                    'Path to the resulting TFRecord file.')
+flags.DEFINE_string('output_tfrecord_dev', None,
                     'Path to the resulting TFRecord file.')
 flags.DEFINE_string(
     'label_map_file', None,
     'Path to the label map file. Either a JSON file ending with ".json", that '
-    'maps each possible tag to an ID, or a text file that has one tag per '
-    'line.')
+    'maps each possible tag to an ID, or a text file that has one tag per line.')
 flags.DEFINE_string('vocab_file', None, 'Path to the BERT vocabulary file.')
 flags.DEFINE_integer('max_seq_length', 128, 'Maximum sequence length.')
 flags.DEFINE_bool(
@@ -61,7 +63,7 @@ flags.DEFINE_bool(
     'models and False for cased models.')
 
 
-def _write_example_count(count: int) -> Text:
+def _write_example_count(count: int, output_file: str) -> Text:
     """Saves the number of converted examples to a file.
 
     This count is used when determining the number of training steps.
@@ -72,7 +74,7 @@ def _write_example_count(count: int) -> Text:
     Returns:
       The filename to which the count is saved.
     """
-    count_fname = FLAGS.output_tfrecord + '.num_examples.txt'
+    count_fname = output_file + '.num_examples.txt'
     with tf.gfile.GFile(count_fname, 'w') as count_writer:
         count_writer.write(str(count))
     return count_fname
@@ -83,47 +85,42 @@ def main(argv):
         raise app.UsageError('Too many command-line arguments.')
     flags.mark_flag_as_required('input_file')
     flags.mark_flag_as_required('input_format')
-    flags.mark_flag_as_required('output_tfrecord')
-    # flags.mark_flag_as_required('label_map_file')
+    flags.mark_flag_as_required('output_tfrecord_train')
+    flags.mark_flag_as_required('output_tfrecord_dev')
     flags.mark_flag_as_required('vocab_file')
-
-
-    tokenizer = tokenization.FullTokenizer(FLAGS.vocab_file, do_lower_case=FLAGS.do_lower_case)
-    converter = tagging_converter.TaggingConverter(
-        tagging_converter.get_phrase_vocabulary_from_label_map(label_map),  # phrase_vocabulary  set
-        FLAGS.enable_swap_tag, tokenizer=tokenizer)
-    # print(curLine(), len(label_map), "label_map:", label_map, converter._max_added_phrase_length)
-    builder = bert_example.BertExampleBuilder(label_map, FLAGS.vocab_file,
+    builder = bert_example.BertExampleBuilder({}, FLAGS.vocab_file,
                                               FLAGS.max_seq_length,
-                                              FLAGS.do_lower_case, converter)
+                                              FLAGS.do_lower_case)
 
     num_converted = 0
     num_ignored = 0
-    with tf.python_io.TFRecordWriter(FLAGS.output_tfrecord) as writer:
-        for input_file in [FLAGS.input_file, FLAGS.input_file.replace("train", "dev")]:
-            print(curLine(), "input_file:", input_file)
-            for i, (sources, target) in enumerate(utils.yield_sources_and_targets(
-                    input_file, FLAGS.input_format)):
-                logging.log_every_n(
-                    logging.INFO,
-                    f'{i} examples processed, {num_converted} converted to tf.Example.',
-                    10000)
-                if len(sources[0]) > 30:  # TODO 忽略问题太长的样本
-                    num_ignored += 1
-                    # print(curLine(), "ignore num_ignored=%d, question length=%d" % (num_ignored, len(sources[0])))
-                    continue
-                example = builder.build_bert_example(
-                    sources, target,
-                    FLAGS.output_arbitrary_targets_for_infeasible_examples)
-                if example is None:
-                    num_ignored += 1
-                    continue  # 根据output_arbitrary_targets_for_infeasible_examples，不能转化的忽略或随机，如果随机也会加到num_converted
-                writer.write(example.to_tf_example().SerializeToString())
-                num_converted += 1
+    with tf.python_io.TFRecordWriter(FLAGS.output_tfrecord_train) as writer_train:
+        with tf.python_io.TFRecordWriter(FLAGS.output_tfrecord_dev) as writer_dev:
+            for input_file in [FLAGS.input_file]: # TODO , FLAGS.input_file.replace("train", "dev")]:
+                print(curLine(), "input_file:", input_file)
+                for i, (sources, target) in enumerate(utils.yield_sources_and_targets(
+                        input_file, FLAGS.input_format)):
+                    logging.log_every_n(
+                        logging.INFO,
+                        f'{i} examples processed, {num_converted} converted to tf.Example.',
+                        10000)
+                    if len(sources[0]) > 30:  # TODO 忽略问题太长的样本
+                        num_ignored += 1
+                        # print(curLine(), "ignore num_ignored=%d, question length=%d" % (num_ignored, len(sources[0])))
+                        continue
+                    example = builder.build_bert_example(sources, target).to_tf_example().SerializeToString()
+                    # if i % 10 > 0:
+                    writer_train.write(example)
+                    # else:
+                    #     writer_dev.write(example)
+                    num_converted += 1
     logging.info(f'Done. {num_converted} examples converted to tf.Example, num_ignored {num_ignored} examples.')
-    count_fname = _write_example_count(num_converted)
-    logging.info(f'Wrote:\n{FLAGS.output_tfrecord}\n{count_fname}')
-
+    for output_file in [FLAGS.output_tfrecord_train, FLAGS.output_tfrecord_dev]:
+        count_fname = _write_example_count(num_converted, output_file=output_file)
+        logging.info(f'Wrote:\n{output_file}\n{count_fname}')
+    with open(FLAGS.label_map_file, "w") as f:
+        json.dump(builder._label_map, f, ensure_ascii=False, indent=4)
+    print(curLine(), "save %d to %s" % (len(builder._label_map), FLAGS.label_map_file))
 
 if __name__ == '__main__':
     app.run(main)

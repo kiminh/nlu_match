@@ -30,3 +30,5 @@ def normal_transformer(query):
     query_lower = query.strip("’,?!，。？！� \s").lower()
     rstring = quanjiao2banjiao(query_lower).strip().replace("您","你")
     return rstring
+
+other_tag = "OTHERS"

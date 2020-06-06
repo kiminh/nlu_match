@@ -50,20 +50,20 @@ def read_data(
   """
   sources = []
   predictions = []
-  target_lists = []
+  domain_list = []
   with tf.gfile.GFile(path) as f:
     for line in f:
       if "source" in line and "prediction" in line and "target" in line:
         continue
-      source, pred, *targets = line.rstrip('\n').split('\t')
-      if lowercase:
-        source = normal_transformer(source.lower())
-        pred = normal_transformer(pred.lower())
-        targets = [normal_transformer(t.lower()) for t in targets]
-      sources.append(source)
-      predictions.append(pred)
-      target_lists.append(targets)
-  return sources, predictions, target_lists
+      sessionId, query, prediction, domain, intent = line.rstrip('\n').split('\t')
+      # if lowercase:
+      #   source = normal_transformer(source.lower())
+      #   pred = normal_transformer(pred.lower())
+      #   targets = [normal_transformer(t.lower()) for t in targets]
+      # sources.append(source)
+      predictions.append(prediction)
+      domain_list.append(domain)
+  return predictions, domain_list
 
 
 def compute_exact_score(predictions,

@@ -49,15 +49,15 @@ def main(argv):
     raise app.UsageError('Too many command-line arguments.')
   flags.mark_flag_as_required('prediction_file')
 
-  sources, predictions, target_lists = score_lib.read_data(
+  predictions, domain_list = score_lib.read_data(
       FLAGS.prediction_file, FLAGS.do_lower_case)
   logging.info(f'Read file: {FLAGS.prediction_file}')
-  tokenizer = tokenization.FullTokenizer(FLAGS.vocab_file, do_lower_case=FLAGS.do_lower_case)
-  exact = score_lib.compute_exact_score(predictions, target_lists)
-  sari, keep, addition, deletion, length_sum, length_max = score_lib.compute_sari_scores(
-      sources, predictions, target_lists, tokenizer=tokenizer)
-  print('Num=%d, Exact score=%.3f, SARI score=%.3f, KEEP score=%.3f, ADDITION score=%.3f, DELETION score=%.3f, length_sum=%.3f, length_max=%d'
-    % (len(predictions), 100*exact, 100*sari, 100*keep, 100*addition, 100*deletion, length_sum, length_max))
+  for p, d in zip(predictions, domain_list):
+      print(curLine(), p, d)
+  exact = score_lib.compute_exact_score(predictions, domain_list)
+  # sari, keep, addition, deletion, length_sum, length_max = score_lib.compute_sari_scores(
+  #     sources, predictions, target_lists, tokenizer=tokenizer)
+  print('Num=%d, Exact score=%.3f' % (len(domain_list), exact))
 
 
 if __name__ == '__main__':

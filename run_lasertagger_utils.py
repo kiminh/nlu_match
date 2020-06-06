@@ -99,7 +99,7 @@ class ModelFnBuilder(object):
     self.kernel_size = kernel_size
 
   def _create_model(self, mode, input_ids, input_mask, segment_ids, labels,
-                    labels_mask, drop_keep_prob):
+                    drop_keep_prob):
     """Creates a LaserTagger model."""
     is_training = (mode == tf.estimator.ModeKeys.TRAIN)
     model = modeling.BertModel(
@@ -110,50 +110,34 @@ class ModelFnBuilder(object):
         token_type_ids=segment_ids,
         use_one_hot_embeddings=self._use_one_hot_embeddings)
 
-    final_hidden = model.get_all_encoder_layers()[-1] # TODO 对于当前比较浅的预训练模型，用倒数第１层比倒数第２层好
-    self.conv = tf.keras.layers.Conv1D(filters=128, kernel_size=self.kernel_size,
-                                        strides=1, padding='SAME', name='conv')
-    final_hidden = self.conv(final_hidden)
+    final_hidden = model.get_pooled_output() # TODO 对于当前比较浅的预训练模型，用倒数第１层比倒数第２层好
+    # self.conv = tf.keras.layers.Conv1D(filters=128, kernel_size=self.kernel_size,
+    #                                     strides=1, padding='SAME', name='conv')
+    # final_hidden = self.conv(final_hidden)
 
-    if self._config.use_t2t_decoder:
-      # Size of the output vocabulary which contains the tags + begin and end
-      # tokens used by the Transformer decoder.
-      output_vocab_size = self._num_tags + 2
-      params = _get_decoder_params(self._config, self._use_tpu,
-                                   self._max_seq_length, output_vocab_size)
-      decoder = transformer_decoder.TransformerDecoder(params, is_training)
-      logits = decoder(input_mask, final_hidden, labels) # labels is the id of operation
-    else:
-      if is_training:
+
+    if is_training:
         # I.e., 0.1 dropout
         final_hidden = tf.nn.dropout(final_hidden, keep_prob=drop_keep_prob)
 
-      logits = tf.layers.dense(
+    logits = tf.layers.dense(
           final_hidden,
           self._num_tags,
           kernel_initializer=tf.truncated_normal_initializer(stddev=0.02),
           name="output_projection")
-
     with tf.variable_scope("loss"):
       loss = None
       per_example_loss = None
       if mode != tf.estimator.ModeKeys.PREDICT:
-        loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
+        per_example_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
             labels=labels, logits=logits)
-        per_example_loss = tf.truediv(
-            tf.reduce_sum(loss, axis=1),
-            tf.cast(tf.reduce_sum(labels_mask, axis=1), tf.float32))
+        # per_example_loss = tf.truediv(
+        #     tf.reduce_sum(loss, axis=1),
+        #     tf.cast(tf.reduce_sum(labels_mask, axis=1), tf.float32))
         loss = tf.reduce_mean(per_example_loss)
         pred = tf.cast(tf.argmax(logits, axis=-1), tf.int32)
       else:
-        if self._config.use_t2t_decoder:
-          pred = logits["outputs"]
-          # Transformer decoder reserves the first two IDs to the begin and the
-          # end token so we shift the IDs back.
-          pred -= 2
-        else:
-          pred = tf.cast(tf.argmax(logits, axis=-1), tf.int32)
-
+        pred = tf.cast(tf.argmax(logits, axis=-1), tf.int32)
       return (loss, per_example_loss, pred)
 
   def build(self):
@@ -169,19 +153,13 @@ class ModelFnBuilder(object):
       input_ids = features["input_ids"]
       input_mask = features["input_mask"]
       segment_ids = features["segment_ids"]
-
       labels = None
-      labels_mask = None
       if mode != tf.estimator.ModeKeys.PREDICT:
-        if self._config.use_t2t_decoder:
-          # Account for the begin and end tokens used by Transformer.
-          labels = features["labels"] + 2
-        else:
-          labels = features["labels"]
-        labels_mask = tf.cast(features["labels_mask"], tf.float32)
+        labels = features["labels"]
+
 
       (total_loss, per_example_loss, predictions) = self._create_model(
-          mode, input_ids, input_mask, segment_ids, labels, labels_mask, self.drop_keep_prob)
+          mode, input_ids, input_mask, segment_ids, labels, self.drop_keep_prob)
 
       tvars = tf.trainable_variables()
       initialized_variable_names = {}
@@ -251,32 +229,3 @@ class ModelFnBuilder(object):
       return output_spec
 
     return model_fn
-
-
-def _get_decoder_params(config, use_tpu,
-                        max_seq_length,
-                        output_vocab_size):
-  """Returns hyperparameters for TransformerDecoder.
-
-  Args:
-    config: LaserTagger model configuration.
-    use_tpu: Whether to train on TPUs.
-    max_seq_length: Maximum sequence length.
-    output_vocab_size: Size of the output vocabulary.
-
-  Returns:
-    Hyperparameter dictionary.
-  """
-  params = model_params.BASE_PARAMS
-  params.update(
-      num_hidden_layers=config.decoder_num_hidden_layers,
-      hidden_size=config.decoder_hidden_size,
-      num_heads=config.decoder_num_attention_heads,
-      filter_size=config.decoder_filter_size,
-      vocab_size=output_vocab_size,
-      use_tpu=use_tpu,
-      max_length=max_seq_length,
-      # This parameter should not be changed since we want the number of decoded
-      # tags to equal the number of source tokens.
-      extra_decode_length=0)
-  return params

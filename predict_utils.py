@@ -41,7 +41,7 @@ class LaserTaggerPredictor(object):
     self._predictor = tf_predictor
     self._example_builder = example_builder
     self._id_2_tag = {
-        tag_id: tagging.Tag(tag) for tag, tag_id in label_map.items()
+        tag_id: tag for tag, tag_id in label_map.items()
     }
 
   def predict_batch(self, sources_batch, location_batch=None):  # 由predict改成
@@ -63,15 +63,8 @@ class LaserTaggerPredictor(object):
 
     out = self._predictor(input_info)
     prediction_list= []
-    for output,example in zip(out['pred'], example_list):
+    for output in out['pred']:
       predicted_ids = output.tolist()
-      # Realize output.
-      example.features['labels'] = predicted_ids
-      # Mask out the begin and the end token.
-      #  not need  example.features['labels_mask'] = [0] + [1] * (len(predicted_ids) - 2) + [0]
-      labels = [
-          self._id_2_tag[label_id]  for label_id in example.get_token_labels() if label_id in self._id_2_tag
-      ]
-      prediction = example.editing_task.realize_output(labels)
+      prediction = self._id_2_tag[predicted_ids]
       prediction_list.append(prediction)
     return prediction_list
