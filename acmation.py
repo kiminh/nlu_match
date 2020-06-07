@@ -4,6 +4,13 @@ from curLine_file import curLine
 import json, time
 from curLine_file import curLine
 
+waibu_folder = "/home/cloudminds/PycharmProjects/nlu_projects/nlp/classify/etc/resource/"
+with open(waibu_folder+"ignoreSongMap.json", "r") as f:
+    ignoreSongMap = json.load(f)
+with open(waibu_folder+"frequentSong.json", "r") as f:
+    frequentSong = json.load(f)
+neibu_folder ="/home/cloudminds/Mywork/corpus/compe/69"
+
 class State(object):
     __slots__ = ['identifier', 'symbol', 'success', 'transitions', 'parent',
                  'matched_keyword', 'longest_strict_suffix', 'meta_data']
@@ -195,31 +202,49 @@ class KeywordTree(object):
                             suffix != self._zero_state):
                     state.transitions[symbol] = next_state
 
-
-
 # AC自动机, similar to trie tree
 # 也许直接读取下载的ｘｌｓ文件更方便，但那样需要安装ｘｌｒｄ模块
 entity_folder = "/home/cloudminds/Mywork/corpus/compe/69/slot-dictionaries"
 domain2entity_map = {}
-domain2entity_map["music"] = ["age", "singer", "song", "toplist"]
-domain2entity_map["navigation"] = ["custom_destination"]
+domain2entity_map["music"] = ["age", "singer", "song", "toplist", "theme", "style", "scene", "language", "emotion", "instrument"]
+domain2entity_map["navigation"] = ["custom_destination", "destination", "origin"]
+domain2entity_map["phone_call"] = ["phone_num", "contact_name"]
 self_entity_trie_tree = {}  # 总的实体字典  自己建立的某些实体类型的实体树
 for domain, entity_type_list in domain2entity_map.items():
     print(curLine(), domain, entity_type_list)
     for entity_type in entity_type_list:
-        entity_file = os.path.join(entity_folder, "%s.txt" % entity_type)
-        current_entity_dict = {}
-        with open(entity_file, "r") as fr:
-            lines = fr.readlines()
-        print(curLine(), "get %d %s from %s" % (len(lines), entity_type, entity_file))
         if entity_type not in self_entity_trie_tree:
             ac = KeywordTree(case_insensitive=True)
+        else:
+            ac = self_entity_trie_tree[entity_type]
+
+        entity_file = os.path.join(neibu_folder, "%s.json" % entity_type)
+        with open(entity_file, "r") as fr:
+            current_entity_dict = json.load(fr)
+        for entity_before, entity_after_times in current_entity_dict.items():
+            entity_after = entity_after_times[0]
+            if entity_type == "song" and (entity_after in ignoreSongMap or entity_after in frequentSong):
+                continue
+            elif entity_type == "toplist" and entity_before == "首张":
+                continue
+            ac.add(keywords=entity_before, meta_data=entity_after)
+
+        entity_file = os.path.join(entity_folder, "%s.txt" % entity_type)
+        if os.path.exists(entity_file):
+            with open(entity_file, "r") as fr:
+                lines = fr.readlines()
+            print(curLine(), "get %d %s from %s" % (len(lines), entity_type, entity_file))
+
             for line in lines:
                 entity_after = line.strip()
+                if entity_type=="song" and (entity_after in ignoreSongMap or entity_after in frequentSong):
+                    continue
                 entity_before = entity_after # TODO
+                if entity_type == "toplist" and entity_before == "首张":
+                    continue
                 ac.add(keywords=entity_before, meta_data=entity_after)
-            ac.finalize()
-            self_entity_trie_tree[entity_type] = ac
+        ac.finalize()
+        self_entity_trie_tree[entity_type] = ac
 
 
 def get_all_entity(corpus, useEntityTypeList):
@@ -232,25 +257,54 @@ def get_all_entity(corpus, useEntityTypeList):
 import re
 def get_slot_info(query, domain):
     entity_map = {}
-    if domain == "phone_call":
-        numbers = re.findall("\d+", query)
+
+    useEntityTypeList = domain2entity_map[domain]
+    entityTypeMap = get_all_entity(query, useEntityTypeList=useEntityTypeList)
+    for entity_type, entity_info_list in entityTypeMap.items():
+        for entity_info in entity_info_list:
+            entity_before = entity_info['before']
+            if len(entity_before) < 2 and entity_before != "家":
+                continue
+            entity_map[entity_before] = (entity_type, entity_info['after'])
+    if "phone_num" in useEntityTypeList:
+        numbers = re.findall("[0-9一二三四五六七八九十拾]+", query)  #"\d+[一-九]+", query)
         for number in numbers:
             entity_map[number] = ("phone_num", number)
-    else:
-        useEntityTypeList = domain2entity_map[domain]
-        entityTypeMap = get_all_entity(query, useEntityTypeList=useEntityTypeList)
-
-        for entity_type, entity_info_list in entityTypeMap.items():
-            for entity_info in entity_info_list:
-                entity_before = entity_info['before']
-                if len(entity_before) < 2:
-                    continue
-                entity_map[entity_before] = (entity_type, entity_info['after'])
     entity_list_all = sorted(entity_map.items(), key=lambda item: len(item[0]),
                              reverse=True)  # new_entity_map 中key是实体,value是实体类型
     slot_info = query
+    exist_entityType_set = set()
+    replace_mask = [0] * len(query)
     for entity_before, (entity_type, entity_after) in entity_list_all:
-        if entity_before in slot_info:
-            slot_info = query.replace(entity_before, "<%s>%s</%s>" % (entity_type, entity_after, entity_type))
-            break # TODO  目前只替换一个实体
+        if entity_before not in query:
+            continue
+        if entity_type in exist_entityType_set:
+            continue  # 已经有这个类型了,忽略 # TODO
+        start_location = slot_info.find(entity_before)
+        if start_location > -1: #  exist
+            # if max(replace_mask[start_location:start_location+len(entity_before)+1]) > 0:
+            #     print(curLine(), replace_mask, slot_info, entity_before)
+            #     input(curLine())
+            #     continue
+            # replace_mask[start_location:start_location + len(entity_before)+1] = [1] * len(entity_before)
+            exist_entityType_set.add(entity_type)
+            if entity_after == entity_before:
+                entity_info_str = "<%s>%s</%s>" % (entity_type, entity_after, entity_type)
+            else:
+                entity_info_str = "<%s>%s||%s</%s>" % (entity_type, entity_before, entity_after, entity_type)
+            slot_info = slot_info.replace(entity_before, entity_info_str)
+            query = query.replace(entity_before, "")
+        else:
+            print(curLine(), replace_mask, slot_info, "entity_type:", entity_type, entity_before)
+        # break # TODO  目前只替换一个实体
     return slot_info
+
+if __name__ == '__main__':
+
+    for query in ["拨打10086", "打电话给100十五", "打电话给一二三拾"]:
+        res = get_slot_info(query, domain="phone_call")
+        print(curLine(), query, res)
+
+    for query in ["节奏来一首一朵鲜花送给心上人", "播放歌曲远走高飞"]:
+        res = get_slot_info(query, domain="music")
+        print(curLine(), query, res)

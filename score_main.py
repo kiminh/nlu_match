@@ -59,7 +59,7 @@ def main(argv):
   intent_acc = float(right_intent_num) / all_num
   slot_acc = float(right_slot_num) / all_num
   exact_score = float(exact_num) / all_num
-  print('Num=%d, domain_acc=%.3f, intent_acc=%.3f, slot_acc=%.3f, exact_score=%.3f'
+  print('Num=%d, domain_acc=%.3f, intent_acc=%.3f, slot_acc=%.5f, exact_score=%.3f'
         % (all_num, domain_acc, intent_acc, slot_acc, exact_score))
 
 

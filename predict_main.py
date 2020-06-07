@@ -142,7 +142,7 @@ def main(argv):
             num_predicted += len(prediction_batch)
             for id, [predict_domain, sources] in enumerate(zip(prediction_batch, sources_batch)):
                 sessionId, raw_query = session_list[batch_id * predict_batch_size + id]
-                predict_intent, slot_info = rules(sources, predict_domain)
+                predict_intent, slot_info = rules(raw_query, predict_domain)
                 predict_domain_list.append(predict_domain)
                 predict_intent_list.append(predict_intent)
                 slot_info_list.append(slot_info)
@@ -183,32 +183,36 @@ def main(argv):
     cost_time = (time.time() - start_time) / 1.0
     print(curLine(), "cost %f s" % cost_time)
 
-cancel_keywords = ["取消", "关闭", "停止"]
+cancel_keywords = ["取消", "关闭", "停止", "结束", "关掉", "不要打", "退出", "不需要", "暂停", "谢谢你的服务"]
 
-def rules(sources, predict_domain):
+def rules(raw_query, predict_domain):
     predict_intent = predict_domain  # OTHERS
-    slot_info = sources[-1]
+    slot_info = raw_query
     if predict_domain == "navigation":
         predict_intent = 'navigation'
+        if "打开" in raw_query:
+            predict_intent = "open"
+        elif "开始" in raw_query:
+            predict_intent = "start_navigation"
         for word in cancel_keywords:
-            if word in sources[-1]:
+            if word in raw_query:
                 predict_intent = 'cancel_navigation'
                 break
-        slot_info = acmation.get_slot_info(sources[-1], domain=predict_domain)
+        slot_info = acmation.get_slot_info(raw_query, domain=predict_domain)
     elif predict_domain == 'music':
         predict_intent = 'play'
         for word in cancel_keywords:
-            if word in sources[-1]:
+            if word in raw_query:
                 predict_intent = 'pause'
                 break
-        slot_info = acmation.get_slot_info(sources[-1], domain=predict_domain)
+        slot_info = acmation.get_slot_info(raw_query, domain=predict_domain)
     elif predict_domain == 'phone_call':
         predict_intent = 'make_a_phone_call'
         for word in cancel_keywords:
-            if word in sources[-1]:
+            if word in raw_query:
                 predict_intent = 'cancel'
                 break
-        slot_info = acmation.get_slot_info(sources[-1], domain=predict_domain)
+        slot_info = acmation.get_slot_info(raw_query, domain=predict_domain)
     return predict_intent, slot_info
 
 if __name__ == '__main__':

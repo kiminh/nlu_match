@@ -100,33 +100,33 @@ TIMESTAMP=$(ls "${OUTPUT_DIR}/models/export/" | \
 SAVED_MODEL_DIR=${OUTPUT_DIR}/models/export/${TIMESTAMP}
 PREDICTION_FILE=${OUTPUT_DIR}/models/pred.tsv
 
-echo "predict_main.py" ${label_map_file}
-python predict_main.py \
-  --input_file=${CORPUS_DIR}/dev.txt \
-  --input_format=${input_format} \
-  --output_file=${PREDICTION_FILE} \
-  --label_map_file=${label_map_file} \
-  --vocab_file=${BERT_BASE_DIR}/vocab.txt \
-  --max_seq_length=${max_seq_length} \
-  --do_lower_case=${do_lower_case} \
-  --saved_model=${SAVED_MODEL_DIR}
-
-##### 5. Evaluation
-echo "python score_main.py --prediction_file=" ${PREDICTION_FILE}
-python score_main.py --prediction_file=${PREDICTION_FILE} --vocab_file=${BERT_BASE_DIR}/vocab.txt --do_lower_case=true
-
-
-#echo "predict_main.py"
+#echo "predict_main.py for eval"
 #python predict_main.py \
-#  --input_file=${CORPUS_DIR}/test.csv \
+#  --input_file=${CORPUS_DIR}/dev.txt \
 #  --input_format=${input_format} \
 #  --output_file=${PREDICTION_FILE} \
-#  --submit_file=${SUBMIT_FILE} \
 #  --label_map_file=${label_map_file} \
 #  --vocab_file=${BERT_BASE_DIR}/vocab.txt \
 #  --max_seq_length=${max_seq_length} \
 #  --do_lower_case=${do_lower_case} \
 #  --saved_model=${SAVED_MODEL_DIR}
+#
+###### 5. Evaluation
+#echo "python score_main.py --prediction_file=" ${PREDICTION_FILE}
+#python score_main.py --prediction_file=${PREDICTION_FILE} --vocab_file=${BERT_BASE_DIR}/vocab.txt --do_lower_case=true
+
+
+echo "predict_main.py for test"
+python predict_main.py \
+  --input_file=${CORPUS_DIR}/test.csv \
+  --input_format=${input_format} \
+  --output_file=${PREDICTION_FILE} \
+  --submit_file=${SUBMIT_FILE} \
+  --label_map_file=${label_map_file} \
+  --vocab_file=${BERT_BASE_DIR}/vocab.txt \
+  --max_seq_length=${max_seq_length} \
+  --do_lower_case=${do_lower_case} \
+  --saved_model=${SAVED_MODEL_DIR}
 
 
 end_tm=`date +%s%N`;

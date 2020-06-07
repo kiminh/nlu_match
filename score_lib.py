@@ -69,11 +69,13 @@ def read_data(
         right_intent_num += 1
         if predSlot == Slot:
           exact_num += 1
-      else:
-        print(curLine(), predIntent, "intent:", intent)
+      # else:
+      #   print(curLine(), predIntent, "intent:", intent)
       if predSlot == Slot:
         right_slot_num += 1
-      else:
+      # else:
+      #   print(curLine(), predSlot, "Slot:", Slot, "predDomain:%s, domain:%s" % (predDomain, domain))
+      if domain == "phone_call":
         print(curLine(), predSlot, "Slot:", Slot, "predDomain:%s, domain:%s" % (predDomain, domain))
       predDomain_list.append(predDomain)
       predIntent_list.append(predIntent)
