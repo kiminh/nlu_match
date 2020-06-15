@@ -20,12 +20,9 @@ from __future__ import absolute_import
 from __future__ import division
 
 from __future__ import print_function
-from typing import Any, Mapping, Optional, Text
 from bert import modeling
 from bert import optimization
-import transformer_decoder
 import tensorflow as tf
-from official_transformer import model_params
 from curLine_file import curLine
 
 class LaserTaggerConfig(modeling.BertConfig):
@@ -110,10 +107,12 @@ class ModelFnBuilder(object):
         token_type_ids=segment_ids,
         use_one_hot_embeddings=self._use_one_hot_embeddings)
 
-    final_hidden = model.get_pooled_output() # TODO 对于当前比较浅的预训练模型，用倒数第１层比倒数第２层好
+    final_hidden = model.get_pooled_output()
+    # print(curLine(), "final_hidden:", final_hidden, "self.kernel_size=", self.kernel_size)
     # self.conv = tf.keras.layers.Conv1D(filters=128, kernel_size=self.kernel_size,
     #                                     strides=1, padding='SAME', name='conv')
     # final_hidden = self.conv(final_hidden)
+    # print(curLine(), "final_hidden:", final_hidden)
 
 
     if is_training:
@@ -131,9 +130,6 @@ class ModelFnBuilder(object):
       if mode != tf.estimator.ModeKeys.PREDICT:
         per_example_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
             labels=labels, logits=logits)
-        # per_example_loss = tf.truediv(
-        #     tf.reduce_sum(loss, axis=1),
-        #     tf.cast(tf.reduce_sum(labels_mask, axis=1), tf.float32))
         loss = tf.reduce_mean(per_example_loss)
         pred = tf.cast(tf.argmax(logits, axis=-1), tf.int32)
       else:
@@ -200,7 +196,7 @@ class ModelFnBuilder(object):
             scaffold_fn=scaffold_fn)
 
       elif mode == tf.estimator.ModeKeys.EVAL:
-        def metric_fn(per_example_loss, labels, labels_mask, predictions):
+        def metric_fn(per_example_loss, labels, predictions):
           """Compute eval metrics."""
           accuracy = tf.cast(
               tf.reduce_all(  # tf.reduce_all  相当于＂逻辑ＡＮＤ＂操作，找到输出完全正确的才算正确
@@ -216,7 +212,7 @@ class ModelFnBuilder(object):
           }
 
         eval_metrics = (metric_fn,
-                        [per_example_loss, labels, labels_mask, predictions])
+                        [per_example_loss, labels, predictions])
         output_spec = tf.contrib.tpu.TPUEstimatorSpec(
             mode=mode,
             loss=total_loss,

@@ -20,22 +20,23 @@ fi
 # smaller value (e.g. 0.01).
 export DOMAIN_NAME="domain"
 export input_format="nlu"
-export num_train_epochs=3
+export num_train_epochs=4
 export TRAIN_BATCH_SIZE=128
 export learning_rate=3e-5
 export warmup_proportion=0.1
-export max_seq_length=30
+export max_seq_length=35
 export drop_keep_prob=0.9
 export MAX_INPUT_EXAMPLES=1000000
 export SAVE_CHECKPOINT_STEPS=1000
 export CORPUS_DIR="/home/${HOST_NAME}/Mywork/corpus/compe/69"
 export BERT_BASE_DIR="/home/${HOST_NAME}/Mywork/model/chinese_L-12_H-768_A-12" #
-export CONFIG_FILE=configs/lasertagger_config.json  # lasertagger_config-tiny.json
+export CONFIG_FILE=configs/lasertagger_config.json
 export OUTPUT_DIR="${CORPUS_DIR}/${DOMAIN_NAME}_output"
+export MODEL_DIR="${OUTPUT_DIR}/${DOMAIN_NAME}_models"
 export do_lower_case=true
 export kernel_size=3
 export label_map_file=${OUTPUT_DIR}/label_map.json
-export SUBMIT_FILE=${OUTPUT_DIR}/models/submit.csv
+export SUBMIT_FILE=${MODEL_DIR}/submit.csv
 
 
 python preprocess_main.py \
@@ -49,14 +50,9 @@ python preprocess_main.py \
     --do_lower_case=${do_lower_case}
 
 
-
-
 # Check these numbers from the "*.num_examples" files created in step 2.
 export NUM_TRAIN_EXAMPLES=310922
 export NUM_EVAL_EXAMPLES=5000
-
-
-
 
 #echo "Train the model."
 #python run_lasertagger.py \
@@ -64,7 +60,7 @@ export NUM_EVAL_EXAMPLES=5000
 #  --eval_file=${OUTPUT_DIR}/test.tf_record \
 #  --label_map_file=${label_map_file} \
 #  --model_config_file=${CONFIG_FILE} \
-#  --output_dir=${OUTPUT_DIR}/${DOMAIN_NAME}_models \
+#  --output_dir=${MODEL_DIR} \
 #  --init_checkpoint=${BERT_BASE_DIR}/bert_model.ckpt \
 #  --do_train=true \
 #  --do_eval=true \
@@ -83,24 +79,24 @@ export NUM_EVAL_EXAMPLES=5000
 
 ### 4. Prediction
 
-### Export the model.
+## Export the model.
 #echo "Export the model."
 #python run_lasertagger.py \
 #  --label_map_file=${label_map_file} \
 #  --model_config_file=${CONFIG_FILE} \
 #  --max_seq_length=${max_seq_length} \
 #  --kernel_size=${kernel_size}  \
-#  --output_dir=${OUTPUT_DIR}/${DOMAIN_NAME}_models/ \
+#  --output_dir=${MODEL_DIR}/ \
 #  --do_export=true \
-#  --export_path=${OUTPUT_DIR}/models/export
+#  --export_path=${MODEL_DIR}/export
 #
 #
 ######### Get the most recently exported model directory.
-#TIMESTAMP=$(ls "${OUTPUT_DIR}/models/export/" | \
+#TIMESTAMP=$(ls "${MODEL_DIR}/export/" | \
 #            grep -v "temp-" | sort -r | head -1)
-#SAVED_MODEL_DIR=${OUTPUT_DIR}/models/export/${TIMESTAMP}
-#PREDICTION_FILE=${OUTPUT_DIR}/models/pred.tsv
-#
+#SAVED_MODEL_DIR=${MODEL_DIR}/export/${TIMESTAMP}
+#PREDICTION_FILE=${MODEL_DIR}/pred.tsv
+
 #echo "predict_main.py for eval"
 #python predict_main.py \
 #  --input_file=${CORPUS_DIR}/dev.txt \

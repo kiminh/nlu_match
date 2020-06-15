@@ -20,14 +20,14 @@ fi
 # smaller value (e.g. 0.01).
 export DOMAIN_NAME="domain"
 export input_format="nlu"
-export num_train_epochs=3
-export TRAIN_BATCH_SIZE=128
+export num_train_epochs=4
+export TRAIN_BATCH_SIZE=10
 export learning_rate=3e-5
 export warmup_proportion=0.1
-export max_seq_length=30
+export max_seq_length=35
 export drop_keep_prob=0.9
 export MAX_INPUT_EXAMPLES=1000000
-export SAVE_CHECKPOINT_STEPS=1000
+export SAVE_CHECKPOINT_STEPS=20
 export CORPUS_DIR="/home/${HOST_NAME}/Mywork/corpus/compe/69"
 export BERT_BASE_DIR="/home/${HOST_NAME}/Mywork/model/chinese_L-12_H-768_A-12" #
 export CONFIG_FILE=configs/lasertagger_config.json  # lasertagger_config-tiny.json
@@ -48,9 +48,14 @@ export SUBMIT_FILE=${OUTPUT_DIR}/models/submit.csv
 #    --max_seq_length=${max_seq_length} \
 #    --do_lower_case=${do_lower_case}
 
+
+
+
 # Check these numbers from the "*.num_examples" files created in step 2.
 export NUM_TRAIN_EXAMPLES=310922
 export NUM_EVAL_EXAMPLES=5000
+
+
 
 
 echo "Train the model."

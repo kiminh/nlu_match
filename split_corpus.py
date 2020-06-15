@@ -33,7 +33,7 @@ def get_slot(param):
         before,after = entity_info, entity_info
         if "||" in entity_info:
             before, after = entity_info.split("||")
-
+            print(curLine(), entityType, before, after)
         if before in before2after:
             after = before2after[before]
         # add

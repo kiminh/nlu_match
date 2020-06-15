@@ -22,7 +22,9 @@ from __future__ import division
 from __future__ import print_function
 from collections import defaultdict
 from curLine_file import curLine
-
+from acmation import re_phoneNum, get_all_entity
+tongyin_yuzhi = 0.99
+cancel_keywords = ["取消", "关闭", "停止", "结束", "关掉", "不要打", "退出", "不需要", "暂停", "谢谢你的服务"]
 
 class LaserTaggerPredictor(object):
   """Class for computing and realizing predictions with LaserTagger."""
@@ -49,16 +51,18 @@ class LaserTaggerPredictor(object):
     keys = ['input_ids', 'input_mask', 'segment_ids']
     input_info = defaultdict(list)
     example_list = []
+    input_tokens_list = []
     location = None
     for id, sources in enumerate(sources_batch):
       if location_batch is not None:
-        location = location_batch[id]  #  表示是否能修改
-      example = self._example_builder.build_bert_example(sources, location=location)
+        location = location_batch[id]  # 表示是否能修改
+      example, input_tokens = self._example_builder.build_bert_example(sources, location=location)
       if example is None:
         raise ValueError("Example couldn't be built.")
       for key in keys:
         input_info[key].append(example.features[key])
       example_list.append(example)
+      input_tokens_list.append(input_tokens)
 
     out = self._predictor(input_info)
     prediction_list= []

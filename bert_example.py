@@ -27,7 +27,22 @@ from bert import tokenization
 from curLine_file import curLine
 
 
-
+class my_tokenizer_class(object):
+    def __init__(self, vocab_file, do_lower_case):
+        self.full_tokenizer = tokenization.FullTokenizer(vocab_file, do_lower_case=do_lower_case)
+    # 需要包装一下，因为如果直接对中文用full_tokenizer.tokenize，会忽略文本中的空格
+    def tokenize(self, text):
+        segments = text.split(" ")
+        word_pieces = []
+        for segId, segment in enumerate(segments):
+            if segId > 0:
+                word_pieces.append(" ")
+            word_pieces.extend(self.full_tokenizer.tokenize(segment))
+        return word_pieces
+    def convert_tokens_to_ids(self, tokens):
+        id_list = [self.full_tokenizer.vocab[t]
+                   if t != " " else self.full_tokenizer.vocab["[unused20]"] for t in tokens]
+        return id_list
 
 class BertExample(object):
   """Class for training and inference examples for BERT.
@@ -41,8 +56,7 @@ class BertExample(object):
   def __init__(self, input_ids,
                input_mask,
                segment_ids,
-               labels,
-               token_start_indices):
+               labels):
     input_len = len(input_ids)
     if not (input_len == len(input_mask) and input_len == len(segment_ids)):
       raise ValueError(
@@ -55,7 +69,6 @@ class BertExample(object):
         ('segment_ids', segment_ids),
         ('labels', labels),
     ])
-    self._token_start_indices = token_start_indices
 
   def pad_to_max_length(self, max_seq_length, pad_token_id):
     """Pad the feature vectors so that they all have max_seq_length.
@@ -102,7 +115,7 @@ class BertExampleBuilder(object):
         uncased models and False for cased models.
     """
     self._label_map = label_map
-    self._tokenizer = tokenization.FullTokenizer(vocab_file, do_lower_case=do_lower_case)
+    self._tokenizer = my_tokenizer_class(vocab_file, do_lower_case=do_lower_case)
     self._max_seq_length = max_seq_length
     self._pad_id = self._get_pad_id()
 
@@ -117,10 +130,6 @@ class BertExampleBuilder(object):
 
     Args:
       sources: List of source texts.
-      target: Target text or None when building an example during inference.
-      use_arbitrary_target_ids_for_infeasible_examples: Whether to build an
-        example with arbitrary target ids even if the target can't be obtained
-        via tagging.
 
     Returns:
       BertExample, or None if the conversion from text to tags was infeasible
@@ -144,8 +153,6 @@ class BertExampleBuilder(object):
     #   print(curLine(), "%d tokens is to long," % len(task.source_tokens), "truncate task.source_tokens:", task.source_tokens)
     #  截断到self._max_seq_length - 2
     tokens = self._truncate_list(source_tokens)
-    # print(curLine(), tokens)  # TODO TODO
-
     input_tokens = ['[CLS]'] + tokens + ['[SEP]']
     if sep_mark in tokens:
       context_len = 1 + tokens.index(sep_mark)
@@ -161,10 +168,9 @@ class BertExampleBuilder(object):
         input_ids=input_ids,
         input_mask=input_mask,
         segment_ids=segment_ids,
-        labels=labels,
-        token_start_indices=token_start_indices)
+        labels=labels)
     example.pad_to_max_length(self._max_seq_length, self._pad_id)
-    return example
+    return example, input_tokens
 
   def _split_to_wordpieces(self, tokens):
     """Splits tokens (and the labels accordingly) to WordPieces.
@@ -190,10 +196,10 @@ class BertExampleBuilder(object):
       bert_tokens.extend(pieces)
     return bert_tokens, token_start_indices
 
-  def _truncate_list(self, x):
+  def _truncate_list(self, x): # 从后截断
     """Returns truncated version of x according to the self._max_seq_length."""
     # Save two slots for the first [CLS] token and the last [SEP] token.
-    return x[:self._max_seq_length - 2]
+    return x[-(self._max_seq_length - 2):]
 
   def _get_pad_id(self):
     """Returns the ID of the [PAD] token (or 0 if it's not in the vocab)."""

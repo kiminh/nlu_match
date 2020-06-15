@@ -71,7 +71,7 @@ flags.DEFINE_integer(
     "checkpoints.")
 
 flags.DEFINE_integer("train_batch_size", 32, "Total batch size for training.")
-flags.DEFINE_integer("eval_batch_size", 8, "Total batch size for eval.")
+flags.DEFINE_integer("eval_batch_size", 128, "Total batch size for eval.")
 flags.DEFINE_integer("predict_batch_size", 8, "Total batch size for predict.")
 flags.DEFINE_float("learning_rate", 3e-5, "The initial learning rate for Adam.")
 flags.DEFINE_float(
@@ -85,9 +85,9 @@ flags.DEFINE_float("num_train_epochs", 3.0,
 flags.DEFINE_float("drop_keep_prob", 0.9, "drop_keep_prob")
 flags.DEFINE_integer("kernel_size", 2, "kernel_size")
 
-flags.DEFINE_integer("save_checkpoints_steps", 1000,
+flags.DEFINE_integer("save_checkpoints_steps", 2000,
                      "How often to save the model checkpoint.")
-flags.DEFINE_integer("keep_checkpoint_max", 5,
+flags.DEFINE_integer("keep_checkpoint_max", 3,
                      "How many checkpoints to keep.")
 flags.DEFINE_integer("iterations_per_loop", 1000,
                      "How many steps to make in each estimator call.")
@@ -183,10 +183,8 @@ def _calculate_steps(num_examples, batch_size, num_epochs, warmup_proportion=0):
 
 def main(_):
     tf.logging.set_verbosity(tf.logging.INFO)
-
     if not (FLAGS.do_train or FLAGS.do_eval or FLAGS.do_export):
-        raise ValueError("At least one of `do_train`, `do_eval` or `do_export` must"
-                         " be True.")
+        raise ValueError("At least one of `do_train`, `do_eval` or `do_export` must be True.")
 
     model_config = run_lasertagger_utils.LaserTaggerConfig.from_json_file(
         FLAGS.model_config_file)
@@ -260,8 +258,7 @@ def main(_):
         estimator.train(input_fn=train_input_fn, max_steps=num_train_steps)
 
     if FLAGS.do_export:
-        tf.logging.info("Exporting the model...")
-
+        tf.logging.info("Exporting the model to %s"% FLAGS.export_path)
         def serving_input_fn():
             def _input_fn():
                 features = {

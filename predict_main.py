@@ -84,14 +84,15 @@ def main(argv):
     ##### test
     print(colored("%s input file:%s" % (curLine(), FLAGS.input_file), "red"))
     domain_list = []
+    slot_info_list = []
     intent_list = []
-    slot_list = []
+
+    predict_domain_list = []
+    previous_pred_slot_list = []
+    previous_pred_intent_list = []
     sources_list = []
     predict_batch_size = 64
     limit = predict_batch_size * 1500 # 5184 #　10001 #
-    run_mode = "eval"
-    if "test.csv" in FLAGS.input_file:
-        run_mode = "predict"
     with tf.gfile.GFile(FLAGS.input_file) as f:
         reader = csv.reader(f)
         session_list = []
@@ -116,7 +117,7 @@ def main(argv):
                     domain, intent = domain_intent.split(".")
                 domain_list.append(domain)
                 intent_list.append(intent)
-                slot_list.append(slot)
+                slot_info_list.append(slot)
             if len(sources_list) >= limit:
                 print(colored("%s stop reading at %d to save time" %(curLine(), limit), "red"))
                 break
@@ -124,7 +125,7 @@ def main(argv):
     number = len(sources_list)  # 总样本数
     predict_domain_list = []
     predict_intent_list = []
-    slot_info_list = []
+    predict_slot_list = []
     predict_batch_size = min(predict_batch_size, number)
     batch_num = math.ceil(float(number) / predict_batch_size)
     start_time = time.time()
@@ -149,7 +150,7 @@ def main(argv):
                 if len(domain_list)>0: # 有标注
                     domain = domain_list[batch_id * predict_batch_size + id]
                     intent = intent_list[batch_id * predict_batch_size + id]
-                    slot = slot_list[batch_id * predict_batch_size + id]
+                    slot = slot_info_list[batch_id * predict_batch_size + id]
                     writer.write("\t".join([sessionId, raw_query, predict_domain, predict_intent, slot_info, domain, intent, slot]) + "\n")
             if batch_id % 5 == 0:
                 cost_time = (time.time() - start_time) / 60.0
@@ -180,10 +181,12 @@ def main(argv):
                 writer.writerow(line)
         print(curLine(), "example_id=", example_id)
         print(curLine(), "domain_counter:", domain_counter)
-    cost_time = (time.time() - start_time) / 1.0
-    print(curLine(), "cost %f s" % cost_time)
+        cost_time = (time.time() - start_time) / 60.0
+        num_predicted = example_id+1
+        print(curLine(), "domain cost %f s" % (cost_time))
+        print(
+            f'{curLine()} {num_predicted} predictions saved to:{FLAGS.submit_file}, cost {cost_time} min, ave {cost_time/num_predicted*60} s.')
 
-cancel_keywords = ["取消", "关闭", "停止", "结束", "关掉", "不要打", "退出", "不需要", "暂停", "谢谢你的服务"]
 
 def rules(raw_query, predict_domain):
     predict_intent = predict_domain  # OTHERS
@@ -194,21 +197,30 @@ def rules(raw_query, predict_domain):
             predict_intent = "open"
         elif "开始" in raw_query:
             predict_intent = "start_navigation"
-        for word in cancel_keywords:
+        for word in predict_utils.cancel_keywords:
             if word in raw_query:
                 predict_intent = 'cancel_navigation'
                 break
         slot_info = acmation.get_slot_info(raw_query, domain=predict_domain)
     elif predict_domain == 'music':
         predict_intent = 'play'
-        for word in cancel_keywords:
+        for word in predict_utils.cancel_keywords:
             if word in raw_query:
                 predict_intent = 'pause'
                 break
+        for word in ["下一", "换一首", "换一曲", "切歌", "其他歌"]:
+            if word in raw_query:
+                predict_intent = 'next'
+                break
         slot_info = acmation.get_slot_info(raw_query, domain=predict_domain)
+        if predict_intent not in ['play','pause'] and slot_info != raw_query: # 根据槽位修改意图　　换一首<singer>高安</singer>的<song>红尘情歌</song>
+            print(curLine(), predict_intent, slot_info)
+            predict_intent = 'play'
+        # if predict_intent != 'play': # 换一首<singer>高安</singer>的<song>红尘情歌</song>
+        #     print(curLine(), predict_intent, slot_info)
     elif predict_domain == 'phone_call':
         predict_intent = 'make_a_phone_call'
-        for word in cancel_keywords:
+        for word in predict_utils.cancel_keywords:
             if word in raw_query:
                 predict_intent = 'cancel'
                 break
