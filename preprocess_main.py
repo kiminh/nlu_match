@@ -95,25 +95,21 @@ def main(argv):
     num_converted = 0
     num_ignored = 0
     with tf.python_io.TFRecordWriter(FLAGS.output_tfrecord_train) as writer_train:
-        with tf.python_io.TFRecordWriter(FLAGS.output_tfrecord_dev) as writer_dev:
-            for input_file in [FLAGS.input_file]: # TODO , FLAGS.input_file.replace("train", "dev")]:
-                print(curLine(), "input_file:", input_file)
-                for i, (sources, target) in enumerate(utils.yield_sources_and_targets(
-                        input_file, FLAGS.input_format)):
-                    logging.log_every_n(
-                        logging.INFO,
-                        f'{i} examples processed, {num_converted} converted to tf.Example.',
-                        10000)
-                    if len(sources[0]) > 30:  # TODO 忽略问题太长的样本
-                        num_ignored += 1
-                        # print(curLine(), "ignore num_ignored=%d, question length=%d" % (num_ignored, len(sources[0])))
-                        continue
-                    example = builder.build_bert_example(sources, target).to_tf_example().SerializeToString()
-                    # if i % 10 > 0:
-                    writer_train.write(example)
-                    # else:
-                    #     writer_dev.write(example)
-                    num_converted += 1
+        for input_file in [FLAGS.input_file]:
+            print(curLine(), "input_file:", input_file)
+            for i, (sources, target) in enumerate(utils.yield_sources_and_targets(
+                    input_file, FLAGS.input_format)):
+                logging.log_every_n(
+                    logging.INFO,
+                    f'{i} examples processed, {num_converted} converted to tf.Example.',
+                    10000)
+                if len(sources[0]) > 30:  # TODO 忽略问题太长的样本
+                    num_ignored += 1
+                    # print(curLine(), "ignore num_ignored=%d, question length=%d" % (num_ignored, len(sources[0])))
+                    continue
+                example = builder.build_bert_example(sources, target).to_tf_example().SerializeToString()
+                writer_train.write(example)
+                num_converted += 1
     logging.info(f'Done. {num_converted} examples converted to tf.Example, num_ignored {num_ignored} examples.')
     for output_file in [FLAGS.output_tfrecord_train, FLAGS.output_tfrecord_dev]:
         count_fname = _write_example_count(num_converted, output_file=output_file)

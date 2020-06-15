@@ -21,11 +21,11 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
-
-from bert import tokenization
-import tagging
-from curLine_file import curLine
 import tensorflow as tf
+from bert import tokenization
+
+from curLine_file import curLine
+
 
 
 
@@ -129,7 +129,7 @@ class BertExampleBuilder(object):
     # Compute target labels.
     sep_mark = '[SEP]'
     source_tokens = self._tokenizer.tokenize(sources[-1]) #current query
-    if len(sources) > 0:  # context
+    if len(sources) > 1:  # TODO context
       source_tokens = self._tokenizer.tokenize(sources[0]) + ['[SEP]'] + source_tokens
     # print(curLine(), len(source_tokens), "source_tokens:", source_tokens)
     if target not in self._label_map:

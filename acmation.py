@@ -263,7 +263,7 @@ def get_slot_info(query, domain):
     for entity_type, entity_info_list in entityTypeMap.items():
         for entity_info in entity_info_list:
             entity_before = entity_info['before']
-            if len(entity_before) < 2 and entity_before != "家":
+            if len(entity_before) < 2 and entity_before not in ["家", "妈"]:
                 continue
             entity_map[entity_before] = (entity_type, entity_info['after'])
     if "phone_num" in useEntityTypeList:
@@ -282,11 +282,6 @@ def get_slot_info(query, domain):
             continue  # 已经有这个类型了,忽略 # TODO
         start_location = slot_info.find(entity_before)
         if start_location > -1: #  exist
-            # if max(replace_mask[start_location:start_location+len(entity_before)+1]) > 0:
-            #     print(curLine(), replace_mask, slot_info, entity_before)
-            #     input(curLine())
-            #     continue
-            # replace_mask[start_location:start_location + len(entity_before)+1] = [1] * len(entity_before)
             exist_entityType_set.add(entity_type)
             if entity_after == entity_before:
                 entity_info_str = "<%s>%s</%s>" % (entity_type, entity_after, entity_type)
@@ -296,7 +291,6 @@ def get_slot_info(query, domain):
             query = query.replace(entity_before, "")
         else:
             print(curLine(), replace_mask, slot_info, "entity_type:", entity_type, entity_before)
-        # break # TODO  目前只替换一个实体
     return slot_info
 
 if __name__ == '__main__':

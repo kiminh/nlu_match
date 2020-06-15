@@ -22,7 +22,6 @@ from __future__ import division
 from __future__ import print_function
 from collections import defaultdict
 from curLine_file import curLine
-import tagging
 
 
 class LaserTaggerPredictor(object):

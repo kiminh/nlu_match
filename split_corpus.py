@@ -69,7 +69,7 @@ def process(source_file, train_file, dev_file):
                 if row_id==0:
                     continue
                 (sessionId, raw_query, domain_intent, param) = line
-                all_slot = get_slot(param)
+                get_slot(param)
 
                 if domain_intent == other_tag:
                     domain = other_tag

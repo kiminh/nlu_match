@@ -273,6 +273,9 @@ def main(_):
                     features=features, receiver_tensors=features)
 
             return _input_fn
+        if not os.path.exists(FLAGS.export_path):
+            print(curLine(), "will make dir:%s" % FLAGS.export_path)
+            os.makedirs(FLAGS.export_path)
 
         estimator.export_saved_model(
             FLAGS.export_path,
