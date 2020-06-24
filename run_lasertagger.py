@@ -268,7 +268,6 @@ def main(_):
                 }
                 return tf.estimator.export.ServingInputReceiver(
                     features=features, receiver_tensors=features)
-
             return _input_fn
         if not os.path.exists(FLAGS.export_path):
             print(curLine(), "will make dir:%s" % FLAGS.export_path)

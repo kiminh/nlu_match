@@ -42,7 +42,7 @@ flags.DEFINE_bool(
     'do_lower_case', True,
     'Whether score computation should be case insensitive (in the LaserTagger '
     'paper this was set to True).')
-flags.DEFINE_string('vocab_file', None, 'Path to the BERT vocabulary file.')
+
 
 def main(argv):
   if len(argv) > 1:

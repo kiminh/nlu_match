@@ -138,28 +138,36 @@ class BertExampleBuilder(object):
     # Compute target labels.
     sep_mark = '[SEP]'
     source_tokens = self._tokenizer.tokenize(sources[-1]) #current query
-    if len(sources) > 1:  # TODO context
-      source_tokens = self._tokenizer.tokenize(sources[0]) + ['[SEP]'] + source_tokens
-    # print(curLine(), len(source_tokens), "source_tokens:", source_tokens)
+    if len(sources) > 1:
+      source_tokens = self._tokenizer.tokenize(sources[-2]) + ['[SEP]'] + source_tokens
+      if len(sources) > 2:  # TODO context
+          source_tokens = self._tokenizer.tokenize(sources[-3]) + ['[SEP]'] + source_tokens
     if target not in self._label_map:
       self._label_map[target] = len(self._label_map)
     labels = self._label_map[target]
-    # tokens, token_start_indices = self._split_to_wordpieces(source_tokens) # TODO
-    token_start_indices = []
-    for t in source_tokens:
-      token_start_indices.append(len(token_start_indices))
 
-    # if len(tokens)>self._max_seq_length - 2:
-    #   print(curLine(), "%d tokens is to long," % len(task.source_tokens), "truncate task.source_tokens:", task.source_tokens)
     #  截断到self._max_seq_length - 2
     tokens = self._truncate_list(source_tokens)
-    input_tokens = ['[CLS]'] + tokens + ['[SEP]']
-    if sep_mark in tokens:
-      context_len = 1 + tokens.index(sep_mark)
-      segment_ids = [0] * (context_len+1) + [1] * (len(tokens) - context_len + 1)  # cls and sep
-    else:
-      segment_ids = [0] * len(input_tokens)
-    assert len(segment_ids) == len(input_tokens) # TODO
+    # if len(source_tokens)>self._max_seq_length - 2:
+    #   print(curLine(), "%d tokens is to long," % len(source_tokens), "truncate task.source_tokens:", source_tokens)
+    #   print(curLine(), len(tokens), "tokens:", tokens, "\n")
+    input_tokens = ['[CLS]'] + tokens + [sep_mark]
+
+    context_len_list = [] # i+1 for i,t in enumerate(tokens) if t==sep_mark]
+    for i, t in enumerate(tokens):
+        if t == sep_mark:
+            if len(context_len_list) > 0:
+                context_len_list.append(i+1-context_len_list[-1])
+            else:
+                context_len_list.append(i+1)
+    segment_ids = [0]
+    segment_index = 0
+    context_len = 0
+    for context_len in context_len_list:
+        segment_ids.extend([segment_index] * context_len) #
+        segment_index += 1
+    segment_ids.extend([segment_index] * (len(tokens) - len(segment_ids) + 2))
+    assert len(segment_ids) == len(input_tokens)  # TODO
 
     input_ids = self._tokenizer.convert_tokens_to_ids(input_tokens)
     input_mask = [1] * len(input_ids)

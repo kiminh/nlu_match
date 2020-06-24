@@ -66,8 +66,15 @@ class LaserTaggerPredictor(object):
 
     out = self._predictor(input_info)
     prediction_list= []
-    for output in out['pred']:
-      predicted_ids = output.tolist()
+    pred_domainMap_batch = []
+    for predicted_ids, score in zip(out['pred'], out["scores"]):
+      predicted_ids = predicted_ids.tolist()
       prediction = self._id_2_tag[predicted_ids]
       prediction_list.append(prediction)
-    return prediction_list
+      pred_domainMap = {}
+      for id, tag in self._id_2_tag.items():
+        pred_domainMap[tag] = float(score[id])
+      # print(curLine(), pred_domainMap)
+      # input(curLine())
+      pred_domainMap_batch.append(pred_domainMap)
+    return prediction_list, pred_domainMap_batch

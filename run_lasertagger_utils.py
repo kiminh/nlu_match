@@ -124,6 +124,7 @@ class ModelFnBuilder(object):
           self._num_tags,
           kernel_initializer=tf.truncated_normal_initializer(stddev=0.02),
           name="output_projection")
+    scores = None
     with tf.variable_scope("loss"):
       loss = None
       per_example_loss = None
@@ -134,7 +135,8 @@ class ModelFnBuilder(object):
         pred = tf.cast(tf.argmax(logits, axis=-1), tf.int32)
       else:
         pred = tf.cast(tf.argmax(logits, axis=-1), tf.int32)
-      return (loss, per_example_loss, pred)
+        scores = tf.nn.softmax(logits, axis=-1)
+      return (loss, per_example_loss, pred, scores)
 
   def build(self):
     """Returns `model_fn` closure for TPUEstimator."""
@@ -154,7 +156,7 @@ class ModelFnBuilder(object):
         labels = features["labels"]
 
 
-      (total_loss, per_example_loss, predictions) = self._create_model(
+      (total_loss, per_example_loss, predictions, scores) = self._create_model(
           mode, input_ids, input_mask, segment_ids, labels, self.drop_keep_prob)
 
       tvars = tf.trainable_variables()
@@ -194,33 +196,9 @@ class ModelFnBuilder(object):
             loss=total_loss,
             train_op=train_op,
             scaffold_fn=scaffold_fn)
-
-      elif mode == tf.estimator.ModeKeys.EVAL:
-        def metric_fn(per_example_loss, labels, predictions):
-          """Compute eval metrics."""
-          accuracy = tf.cast(
-              tf.reduce_all(  # tf.reduce_all  相当于＂逻辑ＡＮＤ＂操作，找到输出完全正确的才算正确
-                  tf.logical_or(
-                      tf.equal(labels, predictions),
-                      ~tf.cast(labels_mask, tf.bool)),
-                  axis=1), tf.float32)
-          return {
-              # This is equal to the Exact score if the final realization step
-              # doesn't introduce errors.
-              "sentence_level_acc": tf.metrics.mean(accuracy),
-              "eval_loss": tf.metrics.mean(per_example_loss),
-          }
-
-        eval_metrics = (metric_fn,
-                        [per_example_loss, labels, predictions])
-        output_spec = tf.contrib.tpu.TPUEstimatorSpec(
-            mode=mode,
-            loss=total_loss,
-            eval_metrics=eval_metrics,
-            scaffold_fn=scaffold_fn)
       else:
         output_spec = tf.contrib.tpu.TPUEstimatorSpec(
-            mode=mode, predictions={"pred": predictions},
+            mode=mode, predictions={"pred": predictions, "scores":scores},
             scaffold_fn=scaffold_fn)
       return output_spec
 

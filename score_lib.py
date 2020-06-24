@@ -57,7 +57,7 @@ def read_data(
   exact_num = 0
   with tf.gfile.GFile(path) as f:
     for line in f:
-      if "source" in line and "prediction" in line and "target" in line:
+      if "sessionId" in line and "pred" in line:
         continue
       sessionId, query, predDomain,predIntent,predSlot, domain,intent,Slot = line.rstrip('\n').split('\t')
       # if lowercase:
@@ -75,8 +75,8 @@ def read_data(
         right_slot_num += 1
       # else:
       #   print(curLine(), predSlot, "Slot:", Slot, "predDomain:%s, domain:%s" % (predDomain, domain))
-      if domain == "phone_call":
-        print(curLine(), predSlot, "Slot:", Slot, "predDomain:%s, domain:%s" % (predDomain, domain))
+      if predDomain != domain:
+        print(curLine(), "predDomain:%s, domain:%s" % (predDomain, domain), predSlot, "Slot:", Slot)
       predDomain_list.append(predDomain)
       predIntent_list.append(predIntent)
       domain_list.append(domain)

@@ -53,8 +53,9 @@ def _nlu_examples(input_file):
     for row_id, (sessionId, raw_query, domain_intent, param) in enumerate(reader):
       query = normal_transformer(raw_query)
       sources = []
-      # if row_id > 1 and sessionId == session_list[row_id - 2][0]:
-      #   sources.append(session_list[row_id-2][1])  # last last query
+      # 目前最多考虑２个历史请求，即三轮对话
+      if row_id > 1 and sessionId == session_list[row_id - 2][0]:
+        sources.append(session_list[row_id-2][1])  # last last query
       if row_id > 0 and sessionId == session_list[row_id - 1][0]:
         sources.append(session_list[row_id-1][1])  # last query
       sources.append(query)

@@ -106,8 +106,8 @@ if __name__ == "__main__":
     dev_file = os.path.join(corpus_folder, "dev.txt")
     process(source_file, train_file, dev_file)
 
-    for entityType, entityDict in all_entity_dict.items():
-        json_file = os.path.join(corpus_folder, "%s.json" % entityType)
-        with open(json_file, "w") as f:
-            json.dump(entityDict, f, ensure_ascii=False, indent=4)
-        print(curLine(), "save %d %s to %s" % (len(entityDict), entityType, json_file))
+    # for entityType, entityDict in all_entity_dict.items():
+    #     json_file = os.path.join(corpus_folder, "%s.json" % entityType)
+    #     with open(json_file, "w") as f:
+    #         json.dump(entityDict, f, ensure_ascii=False, indent=4)
+    #     print(curLine(), "save %d %s to %s" % (len(entityDict), entityType, json_file))

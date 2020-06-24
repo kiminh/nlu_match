@@ -105,9 +105,10 @@ def main(argv):
                     10000)
                 if len(sources[-1]) > FLAGS.max_seq_length:  # TODO 忽略问题太长的样本
                     num_ignored += 1
-                    print(curLine(), "ignore num_ignored=%d, question length=%d" % (num_ignored, len(sources[0])))
+                    print(curLine(), "ignore num_ignored=%d, question length=%d" % (num_ignored, len(sources[-1])))
                     continue
-                example = builder.build_bert_example(sources, target).to_tf_example().SerializeToString()
+                example1,_ = builder.build_bert_example(sources, target)
+                example = example1.to_tf_example().SerializeToString()
                 writer_train.write(example)
                 num_converted += 1
     logging.info(f'Done. {num_converted} examples converted to tf.Example, num_ignored {num_ignored} examples.')

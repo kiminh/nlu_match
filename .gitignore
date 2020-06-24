@@ -4,7 +4,7 @@
 *score.txt
 *.jsonl
 *.pickle
-*results.txt
+*score.txt
 jielun*
 *_model.txt
 lgbm_*.json
