@@ -180,30 +180,6 @@ class BertExampleBuilder(object):
     example.pad_to_max_length(self._max_seq_length, self._pad_id)
     return example, input_tokens
 
-  def _split_to_wordpieces(self, tokens):
-    """Splits tokens (and the labels accordingly) to WordPieces.
-
-    Args:
-      tokens: Tokens to be split.
-      labels: Labels (one per token) to be split.
-
-    Returns:
-      3-tuple with the split tokens, split labels, and the indices of the
-      WordPieces that start a token.
-    """
-    bert_tokens = []  # Original tokens split into wordpieces.
-    # Index of each wordpiece that starts a new token.
-    token_start_indices = []
-    for i, token in enumerate(tokens):
-      # '+ 1' is because bert_tokens will be prepended by [CLS] token later.
-      token_start_indices.append(len(bert_tokens) + 1)
-      if token != "[SEP]":
-        pieces = self._tokenizer.tokenize(token)
-      else:
-        pieces = ["[SEP]"]
-      bert_tokens.extend(pieces)
-    return bert_tokens, token_start_indices
-
   def _truncate_list(self, x): # 从后截断
     """Returns truncated version of x according to the self._max_seq_length."""
     # Save two slots for the first [CLS] token and the last [SEP] token.

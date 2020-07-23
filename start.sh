@@ -1,21 +1,12 @@
 # domain识别
-
 start_tm=`date +%s%N`;
-
 export HOST_NAME=$1
-if [[ "wzk" == "$HOST_NAME" ]]
-then
-  # set gpu id to use
-  export CUDA_VISIBLE_DEVICES=0
-else
-  # not use gpu
-  export CUDA_VISIBLE_DEVICES=""
-fi
 
 # base verson
 #export BERT_DIR="/home/${HOST_NAME}/Mywork/model/chinese_L-12_H-768_A-12"
 #export CONFIG_FILE=configs/lasertagger_config.json
 #export init_checkpoint=${BERT_DIR}/bert_model.ckpt
+
 # large verson
 export BERT_DIR="/home/${HOST_NAME}/Mywork/model/roeberta_zh_L-24_H-1024_A-16"
 export CONFIG_FILE=configs/lasertagger_config_large.json
@@ -119,18 +110,18 @@ echo "python score_main.py --prediction_file=" ${PREDICTION_FILE}
 python score_main.py --prediction_file=${PREDICTION_FILE} --do_lower_case=true
 
 
-echo "predict_main.py for test"
-python predict_main.py \
-  --input_file=${CORPUS_DIR}/test.csv \
-  --input_format=${input_format} \
-  --output_file=${PREDICTION_FILE} \
-  --submit_file=${SUBMIT_FILE} \
-  --label_map_file=${label_map_file} \
-  --vocab_file=${BERT_DIR}/vocab.txt \
-  --max_seq_length=${max_seq_length} \
-  --do_lower_case=${do_lower_case} \
-  --saved_model=${SAVED_MODEL_DIR} \
-  --domain_score_folder=${MODEL_DIR}
+#echo "predict_main.py for test"
+#python predict_main.py \
+#  --input_file=${CORPUS_DIR}/test.csv \
+#  --input_format=${input_format} \
+#  --output_file=${PREDICTION_FILE} \
+#  --submit_file=${SUBMIT_FILE} \
+#  --label_map_file=${label_map_file} \
+#  --vocab_file=${BERT_DIR}/vocab.txt \
+#  --max_seq_length=${max_seq_length} \
+#  --do_lower_case=${do_lower_case} \
+#  --saved_model=${SAVED_MODEL_DIR} \
+#  --domain_score_folder=${MODEL_DIR}
 
 
 end_tm=`date +%s%N`;

@@ -1,5 +1,5 @@
-# LaserTagger
-bash run.sh host_name
+# BERT
+bash train.sh host_name
 
 ## 环境
 Python 3.5+     python3.5~3.7版本下亲测可用，其他版本不清楚  

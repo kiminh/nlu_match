@@ -34,7 +34,7 @@ export do_lower_case=true
 export label_map_file=${OUTPUT_DIR}/label_map.json
 export SUBMIT_FILE=${MODEL_DIR}/submit.csv
 export PREDICTION_FILE=${MODEL_DIR}/pred.tsv
-export prevous_domain_scores="93.03;92.91;92.5"  #"2.91" #
+export prevous_domain_scores="93.03;92.91;93.21"
 
 
 echo "predict_main.py for eval"

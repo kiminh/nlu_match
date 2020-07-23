@@ -9,7 +9,7 @@ export HOST_NAME=$1
 if [[ "wzk" == "$HOST_NAME" ]]
 then
   # set gpu id to use
-  export CUDA_VISIBLE_DEVICES=0
+  export CUDA_VISIBLE_DEVICES="" # 0
 else
   # not use gpu
   export CUDA_VISIBLE_DEVICES=""
